@@ -12,17 +12,6 @@ namespace SharpSCCM
 {
     static class ClientFileSystem
     {
-        public static void AllChecks()
-        {
-            Console.WriteLine("[+] Client cache contents and permissions for the current user:");
-            GetDirectoryContentsAndPermissions(@"C:\Windows\ccmcache", true);
-            Console.WriteLine("\n[+] Searching logs for possible UNC paths:");
-            SearchClientLogs(@"(\\\\([a-z|A-Z|0-9|-|_|\s]{2,15}){1}(\.[a-z|A-Z|0-9|-|_|\s]{1,64}){0,3}){1}(\\[^\\|\/|\:|\*|\?|""|\<|\>|\|;|]{1,64}){1,}(\\){0,}");
-            Console.WriteLine("\n[+] Searching logs for possible URLs:");
-            SearchClientLogs(@"(?<Protocol>\w+):\/\/(?<Domain>[\w@][\w.:@]+)\/?[\w\.?=%&=\-@/$,]*");
-            Console.WriteLine();
-        }
-
         public static bool DoesCurrentUserHaveRights(string path, FileSystemRights fileSystemRights)
         {
             try
@@ -48,7 +37,7 @@ namespace SharpSCCM
                 // Check if writing is allowed
                 return rules.OfType<FileSystemAccessRule>().Any(r => (groups.Contains(r.IdentityReference) || r.IdentityReference.Value == sidCurrentUser) && r.AccessControlType == AccessControlType.Allow && (r.FileSystemRights & fileSystemRights) == fileSystemRights);
             }
-            catch (UnauthorizedAccessException e)
+            catch (UnauthorizedAccessException)
             {
                 return false;
             }
@@ -99,21 +88,21 @@ namespace SharpSCCM
                     }
                 }
             }
-            catch (FileNotFoundException e)
+            catch (FileNotFoundException ex)
             {
-                Console.WriteLine($"[!] {e.Message}");
+                Console.WriteLine($"[!] {ex.Message}");
             }
-            catch (UnauthorizedAccessException e)
+            catch (UnauthorizedAccessException ex)
             {
-                Console.WriteLine($"[!] {e.Message}");
+                Console.WriteLine($"[!] {ex.Message}");
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                Console.WriteLine(e);
+                Console.WriteLine(ex);
             }
         }
 
-        public static void GrepFile(string filePath, string stringToFind)
+        public static void GrepFile(string stringToFind, string filePath)
         {
             try
             {
@@ -130,7 +119,7 @@ namespace SharpSCCM
                             if (line.Contains(stringToFind))
                             {
                                 fileMatched= true;
-                                matchLines.Append(line);
+                                matchLines.Add(line);
                             }
                         }
                     }
@@ -144,9 +133,9 @@ namespace SharpSCCM
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                Console.WriteLine(e.Message);
+                Console.WriteLine(ex.Message);
             }
         }
 
@@ -184,15 +173,15 @@ namespace SharpSCCM
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                Console.WriteLine(e.Message);
+                Console.WriteLine(ex.Message);
             }
         }
 
         public static void PushLogs(string startTime, string startDate)
         {
-            ManagementScope wmiConnection = MgmtUtil.NewWmiConnection("localhost", "root\\cimv2");
+            ManagementScope wmiConnection = MgmtUtil.NewWmiConnection("127.0.0.1", "root\\cimv2");
             DateTime startDateObj = DateTime.Parse(startDate);
             // To-do
         }
@@ -203,6 +192,17 @@ namespace SharpSCCM
             {
                 GrepFileRegex(filePath, regex);
             }
+        }
+
+        public static void Triage()
+        {
+            Console.WriteLine("[+] Client cache contents and permissions for the current user:");
+            GetDirectoryContentsAndPermissions(@"C:\Windows\ccmcache", true);
+            Console.WriteLine("\n[+] Searching logs for possible UNC paths:");
+            SearchClientLogs(@"(\\\\([a-z|A-Z|0-9|-|_|\s]{2,15}){1}(\.[a-z|A-Z|0-9|-|_|\s]{1,64}){0,3}){1}(\\[^\\|\/|\:|\*|\?|""|\<|\>|\|;|]{1,64}){1,}(\\){0,}");
+            Console.WriteLine("\n[+] Searching logs for possible URLs:");
+            SearchClientLogs(@"(?<Protocol>\w+):\/\/(?<Domain>[\w@][\w.:@]+)\/?[\w\.?=%&=\-@/$,]*");
+            Console.WriteLine();
         }
     }
 }

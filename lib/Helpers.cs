@@ -6,8 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
-using System.Text;
-using System.Text.RegularExpressions;
 
 namespace SharpSCCM
 {
@@ -51,6 +49,15 @@ namespace SharpSCCM
                 }
             }
             return false;
+        }
+
+        public static string EscapeBackslashes(string theString)
+        {
+            if (theString.Contains(@"\"))
+            {
+                theString = theString.Replace(@"\", @"\\");
+            }
+            return theString; 
         }
 
         static bool IsEmptyLocate<T>(T[] array, T[] candidate)
@@ -106,9 +113,9 @@ namespace SharpSCCM
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                Console.WriteLine("[X] Error parsing masterkey file '{0}' : {1}", masterkey, e.Message);
+                Console.WriteLine("[X] Error parsing masterkey file '{0}' : {1}", masterkey, ex.Message);
             }
 
             return masterkeys;
@@ -156,9 +163,9 @@ namespace SharpSCCM
                         }
                     }
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    Console.WriteLine("[X] Error parsing masterkey file '{0}' : {1}", filePath, e.Message);
+                    Console.WriteLine("[X] Error parsing masterkey file '{0}' : {1}", filePath, ex.Message);
                 }
             }
             else
@@ -181,6 +188,25 @@ namespace SharpSCCM
             WindowsIdentity identity = WindowsIdentity.GetCurrent();
             WindowsPrincipal principal = new WindowsPrincipal(identity);
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
+        }
+
+        public static string GetCurrentUserHexSid()
+        {
+            WindowsIdentity currentUser = WindowsIdentity.GetCurrent();
+            SecurityIdentifier userSid = currentUser.User;
+            Console.WriteLine($"[+] Current user: {currentUser.Name}");
+            Console.WriteLine($"[+] Active Directory SID for current user: {userSid.Value}");
+
+            byte[] binarySid = new byte[userSid.BinaryLength];
+            userSid.GetBinaryForm(binarySid, 0);
+
+            string hexSid = "";
+            foreach (byte b in binarySid)
+            {
+                hexSid += (b.ToString("X2"));
+            }
+            Console.Write($"[+] Active Directory SID (hex): 0x{hexSid}\n");
+            return hexSid;
         }
 
         public static bool GetSystem()
@@ -210,6 +236,7 @@ namespace SharpSCCM
                 success = Interop.DuplicateToken(hToken, 2, ref hDupToken);
                 if (!success)
                 {
+                    Interop.CloseHandle(hToken);
                     //Console.WriteLine("DuplicateToken failed!");
                     return false;
                 }
@@ -217,6 +244,8 @@ namespace SharpSCCM
                 success = Interop.ImpersonateLoggedOnUser(hDupToken);
                 if (!success)
                 {
+                    Interop.CloseHandle(hToken);
+                    Interop.CloseHandle(hDupToken);
                     //Console.WriteLine("ImpersonateLoggedOnUser failed!");
                     return false;
                 }
@@ -264,6 +293,7 @@ namespace SharpSCCM
                 int error = Marshal.GetLastWin32Error();
                 string errorMessage = new Win32Exception((int)error).Message;
                 Console.WriteLine("Error enumerating {0} ({1}) : {2}", keyPath, error, errorMessage);
+                Interop.RegCloseKey(hKey);
                 return null;
             }
 
@@ -274,6 +304,7 @@ namespace SharpSCCM
                 int error = Marshal.GetLastWin32Error();
                 string errorMessage = new Win32Exception((int)error).Message;
                 Console.WriteLine("Error enumerating {0} ({1}) : {2}", keyPath, error, errorMessage);
+                Interop.RegCloseKey(hKey);
                 return null;
             }
             byte[] data = new byte[cbData];
